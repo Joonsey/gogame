@@ -22,7 +22,7 @@ func RunClient(server_ip string) {
 	}
 	defer conn.Close()
 
-	data := InnerData{"Hello, server!", 4}
+	data := ReconcilliationData{"Hello, server!"}
 
 	packet := Packet{}
 	packet.PacketType = PacketTypeMatchFind
@@ -69,7 +69,7 @@ func RunClient(server_ip string) {
 
 				packet = Packet{}
 				packet.PacketType = PacketTypeNegotiate
-				data = InnerData{"Hey other client!", 12}
+				data = ReconcilliationData{"Hey other client!"}
 
 				raw_data, err := SerializePacket(packet, data)
 				if err != nil {
@@ -81,7 +81,7 @@ func RunClient(server_ip string) {
 					fmt.Println("something went wrong when reaching out to match", err)
 				}
 			case PacketTypeNegotiate:
-				var inner_data InnerData
+				var inner_data ReconcilliationData
 				err = dec.Decode(&inner_data)
 
 				// if we get this packet there is a presumption that we have already
@@ -95,11 +95,11 @@ func RunClient(server_ip string) {
 			}
 
 		case <-time.After(5 * time.Second):
-			fmt.Println("sending packet to", other_addr)
+			fmt.Println("sending keepalive packet to", other_addr)
 
 			packet = Packet{}
-			packet.PacketType = PacketTypeNegotiate
-			data = InnerData{"keepalive", 14}
+			packet.PacketType = PacketTypeKeepAlive
+			data = ReconcilliationData{"keepalive"}
 
 			serialized_packet, _ := SerializePacket(packet, data)
 

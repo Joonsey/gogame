@@ -21,15 +21,15 @@ type Packet struct {
 
 const MAGICBYTES = 73458339
 
-type InnerData struct {
+type ReconcilliationData struct {
 	Name string
-	Id   int
 }
 
 const (
 	PacketTypeMatchFind PacketType = iota
 	PacketTypeMatchConnect
 	PacketTypeNegotiate
+	PacketTypeKeepAlive
 )
 
 type NegotiationResponse struct {
