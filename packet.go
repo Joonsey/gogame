@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 )
 
 type PacketType uint8
@@ -15,6 +16,7 @@ type Packet struct {
 	PacketType  PacketType
 	HeaderSize  uint32
 	MagicBytes  uint32
+	Timestamp   uint64
 	PayloadSize uint32
 	TotalSize   uint32
 }
@@ -77,6 +79,12 @@ func DeserializePacket(data []byte) (Packet, []byte, error) {
 		return packet, nil, err
 	}
 
+	err = binary.Read(r, binary.BigEndian, &packet.Timestamp)
+	if err != nil {
+		fmt.Println("error during decoding of timestamp", err)
+		return packet, nil, err
+	}
+
 	err = binary.Read(r, binary.BigEndian, &packet.PayloadSize)
 	if err != nil {
 		fmt.Println("error during decoding of paylaod size", err)
@@ -103,12 +111,15 @@ func SerializePacket(packet Packet, data interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 
 	// setting metadata
-	packet.HeaderSize = 17
+	packet.HeaderSize = 17 + 8
 	packet.MagicBytes = MAGICBYTES
+
+	packet.Timestamp = uint64(time.Now().UTC().UnixMilli())
 
 	binary.Write(&buf, binary.BigEndian, packet.PacketType)
 	binary.Write(&buf, binary.BigEndian, packet.HeaderSize)
 	binary.Write(&buf, binary.BigEndian, packet.MagicBytes)
+	binary.Write(&buf, binary.BigEndian, packet.Timestamp)
 
 	dataBytes, err := serializeData(data)
 	if err != nil {
