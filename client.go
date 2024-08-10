@@ -8,12 +8,6 @@ import (
 	"time"
 )
 
-type PacketData struct {
-	Packet Packet
-	Data   []byte
-	Addr   net.UDPAddr
-}
-
 func RunClient(server_ip string) {
 	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
@@ -27,6 +21,7 @@ func RunClient(server_ip string) {
 	packet := Packet{}
 	packet.PacketType = PacketTypeMatchFind
 
+	// other addr is server address, and will later be routed to the other client
 	other_addr := net.UDPAddr{IP: net.ParseIP(server_ip), Port: 8080}
 
 	raw_data, _ := SerializePacket(packet, data)
@@ -47,7 +42,7 @@ func RunClient(server_ip string) {
 				fmt.Println("error reading", err)
 			}
 
-			packet, data, _ := DeserializePacket(buf[:n])
+			packet, data, err := DeserializePacket(buf[:n])
 			if err != nil {
 				fmt.Println("error reading", err)
 			}

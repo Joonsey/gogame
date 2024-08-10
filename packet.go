@@ -19,6 +19,12 @@ type Packet struct {
 	TotalSize   uint32
 }
 
+type PacketData struct {
+	Packet Packet
+	Data   []byte
+	Addr   net.UDPAddr
+}
+
 const MAGICBYTES = 73458339
 
 type ReconcilliationData struct {
@@ -26,10 +32,11 @@ type ReconcilliationData struct {
 }
 
 const (
-	PacketTypeMatchFind PacketType = iota
+	PacketTypeMatchFind PacketType = iota + 1
 	PacketTypeMatchConnect
 	PacketTypeNegotiate
 	PacketTypeKeepAlive
+	PacketTypeDisconnect
 )
 
 type NegotiationResponse struct {
