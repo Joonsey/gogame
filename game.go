@@ -2,11 +2,10 @@ package main
 
 import (
 	"fmt"
-	"math"
+	"image/color"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"image/color"
-	"log"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 const (
@@ -30,12 +29,7 @@ type Game struct {
 }
 
 func (g *Game) CheckCollision(pos Position) bool {
-	posX, posY := int(math.Round(float64(pos.X) / float64(TILE_SIZE))), int(math.Round(float64(pos.Y) / float64(TILE_SIZE)))
-    if posX < 0 || posX >= len(g.mapData[0]) || posY < 0 || posY >= len(g.mapData) {
-        return false
-    }
-
-    return g.mapData[posY][posX] != 0
+    return false
 }
 
 
@@ -79,18 +73,19 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			default:
 				clr = color.RGBA{128, 128, 128, 255} // Other types
 			}
-			ebitenutil.DrawRect(screen, float64(x*TILE_SIZE), float64(y*TILE_SIZE), TILE_SIZE, TILE_SIZE, clr)
+			vector.DrawFilledRect(screen, float32(x*TILE_SIZE), float32(y*TILE_SIZE), TILE_SIZE, TILE_SIZE, clr, false)
 		}
 	}
 
 	rect_color := color.RGBA{R: 0, G: 255, B: 0, A: 255}
-	ebitenutil.DrawRect(screen, float64(g.Player.Position.X), float64(g.Player.Position.Y), 16, 16, rect_color)
+	vector.DrawFilledRect(screen, float32(g.Player.Position.X), float32(g.Player.Position.Y), 16, 16, rect_color, false)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
 	return SCREEN_WIDTH, SCREEN_HEIGHT
 }
 
+/*
 func main() {
 	ebiten.SetWindowSize(640, 480)
 	ebiten.SetWindowTitle("Hello, World!")
@@ -112,3 +107,4 @@ func main() {
 		log.Fatal(err)
 	}
 }
+*/
