@@ -6,25 +6,38 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"net"
 )
 
+type PacketType uint8
+
 type Packet struct {
-	PacketType uint8
-	HeaderSize uint32
-	MagicBytes uint32
+	PacketType  PacketType
+	HeaderSize  uint32
+	MagicBytes  uint32
 	PayloadSize uint32
-	TotalSize  uint32
+	TotalSize   uint32
 }
 
 const MAGICBYTES = 73458339
 
 type InnerData struct {
 	Name string
-	Id int
+	Id   int
+}
+
+const (
+	PacketTypeMatchFind PacketType = iota
+	PacketTypeMatchConnect
+	PacketTypeNegotiate
+)
+
+type NegotiationResponse struct {
+	Addr net.UDPAddr
 }
 
 func ValidatePacket(packet Packet) error {
-	if packet.TotalSize != packet.HeaderSize + packet.PayloadSize {
+	if packet.TotalSize != packet.HeaderSize+packet.PayloadSize {
 		return errors.New("packet has invalid sizes")
 	}
 
@@ -90,12 +103,12 @@ func SerializePacket(packet Packet, data interface{}) ([]byte, error) {
 	binary.Write(&buf, binary.BigEndian, packet.HeaderSize)
 	binary.Write(&buf, binary.BigEndian, packet.MagicBytes)
 
-	dataBytes, err := SerializeData(data)
+	dataBytes, err := serializeData(data)
 	if err != nil {
 		return nil, err
 	}
 	packet.PayloadSize = uint32(len(dataBytes))
-	packet.TotalSize = uint32(buf.Len() + 8) + uint32(len(dataBytes))
+	packet.TotalSize = uint32(buf.Len()+8) + uint32(len(dataBytes))
 	// adding the 8 bytes from totalsize and payloadsize values
 
 	binary.Write(&buf, binary.BigEndian, packet.PayloadSize)
@@ -107,7 +120,7 @@ func SerializePacket(packet Packet, data interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func SerializeData(data interface{}) ([]byte, error) {
+func serializeData(data interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(data)
