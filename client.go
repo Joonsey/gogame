@@ -98,7 +98,7 @@ func RunClient(server_ip string) {
 
 			serialized_packet, _ := SerializePacket(packet, data)
 
-			_, err = conn.WriteToUDP(serialized_packet , &other_addr)
+			_, err = conn.WriteToUDP(serialized_packet, &other_addr)
 			if err != nil {
 				fmt.Println("something went wrong when reaching out to match", err)
 			}

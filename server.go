@@ -10,19 +10,18 @@ import (
 
 type Connection struct {
 	Keyword string
-	Addr *net.UDPAddr
-	Time int64
+	Addr    *net.UDPAddr
+	Time    int64
 }
 
-func timeoutStaleConnections(keyword_map* map[string]Connection) {
+func timeoutStaleConnections(keyword_map *map[string]Connection) {
 	for key, value := range map[string]Connection(*keyword_map) {
-		if time.Now().UnixMilli() - value.Time > 7000 {
+		if time.Now().UnixMilli()-value.Time > 7000 {
 			fmt.Printf("%s user timed out using '%s' connection key\n", value.Addr, value.Keyword)
 			delete(*keyword_map, key)
 		}
 	}
 }
-
 
 func RunServer() {
 	server_addr, err := net.ResolveUDPAddr("udp", ":8080")
@@ -52,7 +51,6 @@ func RunServer() {
 		}
 	}()
 
-
 	go func() {
 		buf := make([]byte, 1024)
 		for {
@@ -77,6 +75,7 @@ func RunServer() {
 			dec := gob.NewDecoder(bytes.NewReader(packet_data.Data))
 			switch packet_data.Packet.PacketType {
 			case PacketTypeKeepAlive:
+				// refreshing timeout
 				for key, value := range keyword_map {
 					if value.Addr.String() == packet_data.Addr.String() {
 						value.Time = time.Now().UnixMilli()
@@ -90,8 +89,10 @@ func RunServer() {
 				if err != nil {
 					fmt.Println("error during decoding", err)
 				}
+				fmt.Println(packet_data.Packet, packet_data.Addr, inner_data)
 
 				if keyword_map[inner_data.Name].Keyword != "" {
+					fmt.Println("match found!")
 					packet := Packet{}
 					packet.PacketType = PacketTypeMatchConnect
 					data := packet_data.Addr
@@ -114,8 +115,6 @@ func RunServer() {
 				} else {
 					keyword_map[inner_data.Name] = Connection{inner_data.Name, &packet_data.Addr, time.Now().UnixMilli()}
 				}
-
-				fmt.Println(packet_data.Packet, packet_data.Addr, inner_data)
 			}
 		}
 	}

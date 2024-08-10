@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"image/color"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	"image/color"
 )
 
 const (
@@ -20,7 +20,7 @@ type Position struct {
 
 type Player struct {
 	Position Position
-	Speed int
+	Speed    int
 }
 
 type Game struct {
@@ -29,9 +29,8 @@ type Game struct {
 }
 
 func (g *Game) CheckCollision(pos Position) bool {
-    return false
+	return false
 }
-
 
 func (g *Game) Update() error {
 	player_pos := &g.Player.Position
@@ -44,14 +43,18 @@ func (g *Game) Update() error {
 		player_pos.Y += g.Player.Speed
 	}
 
-	if g.CheckCollision(*player_pos){ player_pos.Y = init_player_pos.Y }
+	if g.CheckCollision(*player_pos) {
+		player_pos.Y = init_player_pos.Y
+	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
 		player_pos.X -= g.Player.Speed
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		player_pos.X += g.Player.Speed
 	}
-	if g.CheckCollision(*player_pos){ player_pos.X = init_player_pos.X }
+	if g.CheckCollision(*player_pos) {
+		player_pos.X = init_player_pos.X
+	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyQ) {
 		return ebiten.Termination
