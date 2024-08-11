@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"math/rand"
 	"encoding/gob"
 	"fmt"
 	"net"
 	"time"
 )
+
+const SERVERPORT = 8080
 
 func RunClient(server_ip string) {
 	conn, err := net.ListenUDP("udp", nil)
@@ -22,7 +25,7 @@ func RunClient(server_ip string) {
 	packet.PacketType = PacketTypeMatchFind
 
 	// other addr is server address, and will later be routed to the other client
-	other_addr := net.UDPAddr{IP: net.ParseIP(server_ip), Port: 8080}
+	other_addr := net.UDPAddr{IP: net.ParseIP(server_ip), Port: SERVERPORT}
 
 	raw_data, _ := SerializePacket(packet, data)
 	_, err = conn.WriteToUDP(raw_data, &other_addr)
@@ -49,6 +52,23 @@ func RunClient(server_ip string) {
 
 			packet_data := PacketData{packet, data, *addr}
 			packet_channel <- packet_data
+		}
+	}()
+	go func() {
+		for {
+			if other_addr.Port != SERVERPORT {
+				packet := Packet{}
+				packet.PacketType = PacketTypePositition
+
+				payload := CoordinateData{ rand.Float32(), rand.Float32() }
+				raw_data, err := SerializePacket(packet, payload)
+				if err != nil {
+					fmt.Println("error serializing coordinate packet", err)
+				}
+
+				conn.WriteToUDP(raw_data, &other_addr)
+			}
+			time.Sleep(time.Second * 1)
 		}
 	}()
 
@@ -87,6 +107,11 @@ func RunClient(server_ip string) {
 				other_addr = packet_data.Addr
 
 				fmt.Println(packet_data.Packet, inner_data)
+			case PacketTypePositition:
+				var position_data CoordinateData
+				_ = dec.Decode(&position_data)
+
+				fmt.Println("coordinates recieved: ", position_data)
 			}
 
 		case <-time.After(5 * time.Second):

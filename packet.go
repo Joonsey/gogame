@@ -33,12 +33,18 @@ type ReconcilliationData struct {
 	Name string
 }
 
+type CoordinateData struct {
+	X float32
+	Y float32
+}
+
 const (
 	PacketTypeMatchFind PacketType = iota + 1
 	PacketTypeMatchConnect
 	PacketTypeNegotiate
 	PacketTypeKeepAlive
 	PacketTypeDisconnect
+	PacketTypePositition
 )
 
 type NegotiationResponse struct {
