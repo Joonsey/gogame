@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"image"
 	"image/color"
 	"log"
 	"math/rand"
@@ -27,6 +28,7 @@ type Player struct {
 	Speed    int
 	MoveCooldown float32
 	BaseMoveCooldown float32
+	sprite []*ebiten.Image
 }
 
 type Game struct {
@@ -38,6 +40,21 @@ type Game struct {
 
 func (g *Game) CheckCollision(pos Position) bool {
 	return false
+}
+
+func drawStackedSprites(screen *ebiten.Image, sprites []*ebiten.Image, rotation float64, x, y, offset int){
+	for i, sprite := range sprites {
+		op := &ebiten.DrawImageOptions{}
+
+		spriteWidth := sprite.Bounds().Size().X
+		spriteHeight := sprite.Bounds().Size().Y
+		op.GeoM.Translate(float64(-spriteWidth/2), float64(-spriteHeight/2)) // Center the sprite
+		op.GeoM.Rotate(rotation / 3.14)
+		op.GeoM.Translate(float64(spriteWidth/2), float64(spriteHeight/2)) // Re-adjust the center back
+		op.GeoM.Translate(float64(x), float64(y + -i * offset))
+
+		screen.DrawImage(sprite, op)
+	}
 }
 
 func (g *Game) Update() error {
@@ -83,10 +100,8 @@ func (g *Game) Update() error {
 	return nil
 }
 
-func (g *Game) Draw(screen *ebiten.Image) {
-	tps := ebiten.ActualTPS()
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %f", tps))
-	for y, row := range g.mapData {
+func drawMap(mapData [][]int, screen *ebiten.Image){
+	for y, row := range mapData {
 		for x, cell := range row {
 			var clr color.Color
 			switch cell {
@@ -100,12 +115,16 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			vector.DrawFilledRect(screen, float32(x*TILE_SIZE), float32(y*TILE_SIZE), TILE_SIZE, TILE_SIZE, clr, false)
 		}
 	}
+}
 
-	rect_color := color.RGBA{R: 0, G: 255, B: 0, A: 255}
-	vector.DrawFilledRect(screen, float32(g.Player.Position.X), float32(g.Player.Position.Y), 16, 16, rect_color, false)
+func (g *Game) Draw(screen *ebiten.Image) {
+	tps := ebiten.ActualTPS()
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %f", tps))
 
-	other_rect_color := color.RGBA{R: 0, G: 0, B: 255, A: 255}
-	vector.DrawFilledRect(screen, g.Client.other_pos.X, g.Client.other_pos.Y, 16, 16, other_rect_color, false)
+	drawMap(g.mapData, screen)
+	drawStackedSprites(screen, g.Player.sprite, float64(g.FrameCount / 60), g.Player.Position.X, g.Player.Position.Y, 1)
+	drawStackedSprites(screen, g.Player.sprite, float64(g.FrameCount / 60), int(g.Client.other_pos.X), int(g.Client.other_pos.Y), 1)
+
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
@@ -143,6 +162,23 @@ func expandMap(mapData [][]int, additionalRows int) [][]int {
 	return mapData
 }
 
+func splitSpriteSheet(spriteSheet *ebiten.Image, spriteHeight int) []*ebiten.Image {
+	var sprites []*ebiten.Image
+
+	sheetWidth := spriteSheet.Bounds().Size().X
+	sheetHeight := spriteSheet.Bounds().Size().Y
+
+	for y := sheetHeight; y > 0; y -= spriteHeight {
+		spriteRect := image.Rect(0, y, sheetWidth, y-spriteHeight)
+
+		sprite := spriteSheet.SubImage(spriteRect).(*ebiten.Image)
+
+		sprites = append(sprites, sprite)
+	}
+
+	return sprites
+}
+
 func main() {
 	is_server := flag.String("server", "y", "run server")
 	server_ip := flag.String("ip", "172.20.10.2", "ip")
@@ -159,7 +195,9 @@ func main() {
 	ebiten.SetWindowSize(640, 480)
 	ebiten.SetWindowTitle("Hello, World!")
 	client := Client{}
-	game := Game{Player: Player{Speed: TILE_SIZE, BaseMoveCooldown: 15}, mapData: mapData, Client: &client}
+
+	img, _, _ := ebitenutil.NewImageFromFile("assets/sprites/tank.png")
+	game := Game{Player: Player{Speed: TILE_SIZE, BaseMoveCooldown: 15, sprite: splitSpriteSheet(img, 16) }, mapData: mapData, Client: &client}
 
 	go client.RunClient(*server_ip)
 
