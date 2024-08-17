@@ -150,7 +150,8 @@ func main() {
 
 	} else {
 		server := Server{}
-		go server.host(*server_ip)
+		go server.Host(*server_ip)
+		go client.RunLocalClient()
 	}
 
 	chain := []Position{

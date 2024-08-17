@@ -34,8 +34,19 @@ func (s *Server) listen() {
 	}
 }
 
-func (s *Server) host(mediation_server_ip string) {
-	conn, err := net.ListenUDP("udp", nil)
+func (s *Server) Broadcast(packet_data PacketData) {
+	for value, _ := range s.connections {
+		raw_data, err := SerializePacket(packet_data.Packet, packet_data.Data)
+		if err != nil {
+			fmt.Println("error serializing packet in Broadcast", err)
+		}
+
+		s.conn.WriteToUDP(raw_data, value)
+	}
+}
+
+func (s *Server) Host(mediation_server_ip string) {
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: SERVERPORT})
 	s.conn = conn
 	if err != nil {
 		fmt.Println("Error dialing UDP:", err)
@@ -48,7 +59,7 @@ func (s *Server) host(mediation_server_ip string) {
 	packet := Packet{}
 	packet.PacketType = PacketTypeMatchHost
 
-	s.mediation_server = net.UDPAddr{IP: net.ParseIP(mediation_server_ip), Port: SERVERPORT}
+	s.mediation_server = net.UDPAddr{IP: net.ParseIP(mediation_server_ip), Port: MEDIATION_SERVERPORT}
 
 	raw_data, _ := SerializePacket(packet, data)
 	_, err = conn.WriteToUDP(raw_data, &s.mediation_server)
@@ -105,7 +116,6 @@ func (s *Server) host(mediation_server_ip string) {
 				s.connections[&new_connection] = new_connection
 				fmt.Println("got new connection")
 				fmt.Println("connections: ", s.connections)
-
 
 			case PacketTypeNegotiate:
 				var inner_data ReconcilliationData
