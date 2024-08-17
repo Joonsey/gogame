@@ -40,6 +40,8 @@ type CoordinateData struct {
 
 const (
 	PacketTypeMatchFind PacketType = iota + 1
+	PacketTypeMatchHost
+	PacketTypeMatchStart
 	PacketTypeMatchConnect
 	PacketTypeNegotiate
 	PacketTypeKeepAlive

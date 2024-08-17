@@ -8,114 +8,131 @@ import (
 	"time"
 )
 
-type Connection struct {
-	Keyword string
-	Addr    *net.UDPAddr
-	Time    int64
+type Server struct {
+	mediation_server net.UDPAddr
+	conn           *net.UDPConn
+	connections    map[*net.UDPAddr]net.UDPAddr
+	packet_channel chan PacketData
+	started bool
 }
 
-func timeoutStaleConnections(keyword_map *map[string]Connection) {
-	for key, value := range map[string]Connection(*keyword_map) {
-		if time.Now().UnixMilli()-value.Time > 7000 {
-			fmt.Printf("%s user timed out using '%s' connection key\n", value.Addr, value.Keyword)
-			delete(*keyword_map, key)
+func (s *Server) listen() {
+	buf := make([]byte, 1024)
+	for {
+		n, addr, err := s.conn.ReadFromUDP(buf)
+		if err != nil {
+			fmt.Println("error reading", err)
 		}
+
+		packet, data, err := DeserializePacket(buf[:n])
+		if err != nil {
+			fmt.Println("error reading", err)
+		}
+
+		packet_data := PacketData{packet, data, *addr}
+		s.packet_channel <- packet_data
 	}
 }
 
-func RunServer() {
-	server_addr, err := net.ResolveUDPAddr("udp", ":8080")
+func (s *Server) host(mediation_server_ip string) {
+	conn, err := net.ListenUDP("udp", nil)
+	s.conn = conn
 	if err != nil {
-		fmt.Println("Error resolving address:", err)
+		fmt.Println("Error dialing UDP:", err)
 		return
 	}
-
-	var keyword_map map[string]Connection
-	keyword_map = make(map[string]Connection)
-
-	conn, err := net.ListenUDP("udp", server_addr)
-	if err != nil {
-		fmt.Println("Error listening:", err)
-		return
-	}
-
-	fmt.Println("Listening")
 	defer conn.Close()
 
-	packet_channel := make(chan PacketData)
+	data := ReconcilliationData{"Hello, server!"}
+
+	packet := Packet{}
+	packet.PacketType = PacketTypeMatchHost
+
+	s.mediation_server = net.UDPAddr{IP: net.ParseIP(mediation_server_ip), Port: SERVERPORT}
+
+	raw_data, _ := SerializePacket(packet, data)
+	_, err = conn.WriteToUDP(raw_data, &s.mediation_server)
+	if err != nil {
+		fmt.Println("Error sending data:", err)
+		return
+	}
+
+	s.packet_channel = make(chan PacketData)
+
+	s.connections = make(map[*net.UDPAddr]net.UDPAddr)
+
+	go s.listen()
 
 	go func() {
 		for {
-			timeoutStaleConnections(&keyword_map)
-			time.Sleep(time.Second * 1)
+			time.Sleep(time.Second * 2)
+
+			packet = Packet{}
+			packet.PacketType = PacketTypeKeepAlive
+			serialized_packet, _ := SerializePacket(packet, ReconcilliationData{"keepalive"})
+
+			_, err = conn.WriteToUDP(serialized_packet, &s.mediation_server)
+			if err != nil {
+				fmt.Println("something went wrong when reaching out to match", err)
+			}
+			if s.started { return }
 		}
 	}()
 
-	go func() {
-		buf := make([]byte, 1024)
-		for {
-			n, addr, err := conn.ReadFromUDP(buf)
-			if err != nil {
-				fmt.Println("error reading", err)
-			}
-
-			packet, data, err := DeserializePacket(buf[:n])
-			if err != nil {
-				fmt.Println("error reading", err)
-			}
-
-			packet_data := PacketData{packet, data, *addr}
-			packet_channel <- packet_data
-		}
-	}()
 
 	for {
 		select {
-		case packet_data := <-packet_channel:
+		case packet_data := <-s.packet_channel:
 			dec := gob.NewDecoder(bytes.NewReader(packet_data.Data))
 			switch packet_data.Packet.PacketType {
-			case PacketTypeKeepAlive:
-				// refreshing timeout
-				for key, value := range keyword_map {
-					if value.Addr.String() == packet_data.Addr.String() {
-						value.Time = time.Now().UnixMilli()
-						keyword_map[key] = value
-					}
-				}
+			case PacketTypeMatchConnect:
+				var new_connection net.UDPAddr
+				err = dec.Decode(&new_connection)
+				packet = Packet{}
+				packet.PacketType = PacketTypeNegotiate
+				data = ReconcilliationData{"Hey other client!"}
 
-			case PacketTypeMatchFind:
-				var inner_data ReconcilliationData
-				err := dec.Decode(&inner_data)
+				raw_data, err := SerializePacket(packet, data)
 				if err != nil {
-					fmt.Println("error during decoding", err)
+					fmt.Println("error serializing packet", err)
 				}
-				fmt.Println(packet_data.Packet, packet_data.Addr, inner_data)
 
-				if keyword_map[inner_data.Name].Keyword != "" {
-					fmt.Println("match found!")
-					packet := Packet{}
-					packet.PacketType = PacketTypeMatchConnect
-					data := packet_data.Addr
-					serialized_packet, err := SerializePacket(packet, data)
-					if err != nil {
-						fmt.Println("error during serialization", err)
-					}
-
-					conn.WriteToUDP(serialized_packet, keyword_map[inner_data.Name].Addr)
-
-					data = *keyword_map[inner_data.Name].Addr
-					serialized_packet, err = SerializePacket(packet, data)
-					if err != nil {
-						fmt.Println("error during serialization", err)
-					}
-					conn.WriteToUDP(serialized_packet, &packet_data.Addr)
-
-					delete(keyword_map, inner_data.Name)
-
-				} else {
-					keyword_map[inner_data.Name] = Connection{inner_data.Name, &packet_data.Addr, time.Now().UnixMilli()}
+				_, err = conn.WriteToUDP(raw_data, &new_connection)
+				if err != nil {
+					fmt.Println("something went wrong when reaching out to match", err)
 				}
+
+				s.connections[&new_connection] = new_connection
+				fmt.Println("got new connection")
+				fmt.Println("connections: ", s.connections)
+
+
+			case PacketTypeNegotiate:
+				var inner_data ReconcilliationData
+				err = dec.Decode(&inner_data)
+
+				// if we get this packet there is a presumption that we have already
+				// broken through the NAT address by sending a packet to said address.
+
+				// therefore we can safely assume that the incomming packet is from the owner we want to connect with
+				// and then we can set the owner of the packet to our desired target address to assert the case
+				s.connections[&packet_data.Addr] = packet_data.Addr
+
+				fmt.Println(packet_data.Packet, inner_data)
+			}
+
+		case <-time.After(5 * time.Second):
+			packet = Packet{}
+			packet.PacketType = PacketTypeKeepAlive
+			data = ReconcilliationData{"keepalive"}
+
+			serialized_packet, _ := SerializePacket(packet, data)
+
+			_, err = conn.WriteToUDP(serialized_packet, &s.mediation_server)
+			if err != nil {
+				fmt.Println("something went wrong when reaching out to match", err)
 			}
 		}
 	}
 }
+

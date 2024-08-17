@@ -83,7 +83,7 @@ func (c *Client) RunClient(server_ip string) {
 			case PacketTypeMatchConnect:
 				err = dec.Decode(&c.other_addr)
 
-				fmt.Println(packet, c.other_addr)
+				fmt.Println(packet_data.Packet, c.other_addr)
 
 				packet = Packet{}
 				packet.PacketType = PacketTypeNegotiate
